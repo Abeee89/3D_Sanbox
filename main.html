@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Hand Physics Sandbox</title>
+    <!-- Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #111;
+            color: white;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .panel {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: auto;
+            margin-bottom: 10px;
+        }
+
+        h1 { margin: 0 0 10px 0; font-size: 1.2rem; color: #00d2ff; }
+        
+        .btn-group { display: flex; gap: 8px; margin-bottom: 15px; }
+        
+        button {
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover { background: #444; border-color: #888; }
+        button.active { background: #00d2ff; color: #000; border-color: #00d2ff; }
+
+        .instructions { font-size: 0.85rem; line-height: 1.4; color: #ccc; }
+        .gesture-item { display: flex; align-items: center; margin-top: 5px; }
+        .gesture-key { 
+            background: #555; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 0.7rem; 
+            margin-right: 8px; 
+            font-weight: bold;
+        }
+
+        #webcam-container {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 240px;
+            height: 180px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #333;
+            transform: scaleX(-1);
+        }
+
+        #input_video { display: none; }
+        #output_canvas { width: 100%; height: 100%; object-fit: cover; }
+
+        #stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-family: monospace;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            background: #111;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid #00d2ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="loading-screen">
+    <div class="spinner"></div>
+    <p style="margin-top: 20px;">Menyiapkan Hand Tracking & Mesin Fisika...</p>
+</div>
+
+<div id="ui-layer">
+    <div class="panel">
+        <h1>3D Physics Sandbox</h1>
+        <div class="btn-group" id="shape-selector">
+            <button class="active" onclick="setShape('box')">Kubus</button>
+            <button onclick="setShape('sphere')">Bola</button>
+            <button onclick="setShape('cylinder')">Silinder</button>
+        </div>
+        <button onclick="resetScene()" style="width: 100%; background: #ff4757; border: none;">Reset Scene</button>
+    </div>
+
+    <div class="panel">
+        <h1>Gestur & Kontrol (2 Tangan)</h1>
+        <div class="instructions">
+            <div class="gesture-item"><span class="gesture-key">KLIK & SERET</span> Putar Arena</div>
+            <div class="gesture-item"><span class="gesture-key">DUA TANGAN TERBUKA</span> Munculkan Objek</div>
+            <div class="gesture-item"><span class="gesture-key">SATU TANGAN CUBIT</span> Ambil Objek</div>
+        </div>
+    </div>
+</div>
+
+<div id="stats">FPS: <span id="fps-val">0</span></div>
+
+<div id="webcam-container">
+    <video id="input_video"></video>
+    <canvas id="output_canvas"></canvas>
+</div>
+
+<div id="canvas-container"></div>
+
+<script>
+/**
+ * KONFIGURASI & STATE APLIKASI
+ */
+const config = {
+    gravity: -9.82,
+    handZDepth: -5, 
+    spawnCooldown: 1500, // Cooldown sedikit lebih lama agar stabil
+    pinchThreshold: 0.05, 
+    lerpFactor: 0.15 // Faktor smoothing untuk pergerakan tangan
+};
+
+let scene, camera, renderer, world, controls;
+let handMesh;
+let activeShape = 'box';
+let grabbedBody = null;
+let lastSpawnTime = 0;
+let meshes = [];
+let bodies = [];
+let isPinching = false;
+let currentHandPos = new THREE.Vector3();
+
+/**
+ * INISIALISASI
+ */
+function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1a);
+    scene.fog = new THREE.Fog(0x1a1a1a, 10, 50);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 8, 15);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; 
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 5;
+    controls.maxDistance = 40;
+    controls.maxPolarAngle = Math.PI / 2.1;
+
+    world = new CANNON.World();
+    world.gravity.set(0, config.gravity, 0);
+    world.broadphase = new CANNON.NaiveBroadphase();
+    world.solver.iterations = 10;
+
+    const groundMaterial = new CANNON.Material("groundMaterial");
+    const groundShape = new CANNON.Plane();
+    const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+    groundBody.addShape(groundShape);
+    groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+    world.addBody(groundBody);
+
+    const groundMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 100),
+        new THREE.MeshStandardMaterial({ color: 0x222222 })
+    );
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.receiveShadow = true;
+    scene.add(groundMesh);
+
+    scene.add(new THREE.GridHelper(40, 40, 0x444444, 0x222222));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 15, 5);
+    light.castShadow = true;
+    light.shadow.camera.left = -20;
+    light.shadow.camera.right = 20;
+    light.shadow.camera.top = 20;
+    light.shadow.camera.bottom = -20;
+    scene.add(light);
+
+    const handGeo = new THREE.SphereGeometry(0.2, 16, 16);
+    const handMat = new THREE.MeshStandardMaterial({ color: 0x00d2ff, emissive: 0x00d2ff, emissiveIntensity: 0.5 });
+    handMesh = new THREE.Mesh(handGeo, handMat);
+    scene.add(handMesh);
+
+    window.addEventListener('resize', onWindowResize, false);
+    initHandTracking();
+    animate();
+}
+
+/**
+ * LOGIKA GESTUR & INTERAKSI (2 TANGAN)
+ */
+function handleMultiHandGestures(multiHandLandmarks) {
+    if (!multiHandLandmarks || multiHandLandmarks.length === 0) {
+        if (grabbedBody) releaseGrab();
+        return;
+    }
+
+    // Tangan pertama digunakan untuk interaksi (kursor)
+    const hand1 = multiHandLandmarks[0];
+    const thumb1 = hand1[4];
+    const index1 = hand1[8];
+    const wrist1 = hand1[0];
+
+    // Proyeksi posisi tangan ke World Space
+    const vector = new THREE.Vector3((1 - index1.x * 2), (1 - index1.y * 2), 0.5);
+    vector.unproject(camera);
+    const dir = vector.sub(camera.position).normalize();
+    const distance = -camera.position.z / dir.z + config.handZDepth;
+    const targetPos = camera.position.clone().add(dir.multiplyScalar(distance));
+    
+    // Smoothing (Lerp) pergerakan tangan agar tidak terlalu sensitif
+    currentHandPos.lerp(targetPos, config.lerpFactor);
+    handMesh.position.copy(currentHandPos);
+
+    // Cek Gestur Cubit (Tangan 1)
+    const distPinch = Math.sqrt(Math.pow(thumb1.x - index1.x, 2) + Math.pow(thumb1.y - index1.y, 2));
+    const isCurrentlyPinching = distPinch < config.pinchThreshold;
+
+    if (isCurrentlyPinching && !isPinching) {
+        startGrab(currentHandPos);
+    } else if (!isCurrentlyPinching && isPinching) {
+        releaseGrab();
+    }
+    isPinching = isCurrentlyPinching;
+
+    if (grabbedBody) {
+        grabbedBody.position.set(currentHandPos.x, currentHandPos.y, currentHandPos.z);
+        grabbedBody.velocity.set(0, 0, 0);
+        grabbedBody.angularVelocity.set(0, 0, 0);
+    }
+
+    // LOGIKA SPAWN (2 TANGAN HARUS TERBUKA)
+    if (multiHandLandmarks.length >= 2) {
+        const hand2 = multiHandLandmarks[1];
+        const index2 = hand2[8];
+        const wrist2 = hand2[0];
+
+        // Cek apakah kedua tangan terbuka (ujung jari telunjuk jauh di atas pergelangan)
+        const hand1Open = index1.y < wrist1.y - 0.15;
+        const hand2Open = index2.y < wrist2.y - 0.15;
+
+        if (hand1Open && hand2Open && !grabbedBody) {
+            const now = Date.now();
+            if (now - lastSpawnTime > config.spawnCooldown) {
+                // Spawn di antara kedua tangan atau di posisi kursor
+                spawnObject(currentHandPos);
+                lastSpawnTime = now;
+            }
+        }
+    }
+}
+
+function spawnObject(pos) {
+    let shape, geometry, material, body;
+    const color = new THREE.Color().setHSL(Math.random(), 0.7, 0.5);
+
+    if (activeShape === 'box') {
+        shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+        geometry = new THREE.BoxGeometry(1, 1, 1);
+    } else if (activeShape === 'sphere') {
+        shape = new CANNON.Sphere(0.5);
+        geometry = new THREE.SphereGeometry(0.5, 32, 32);
+    } else if (activeShape === 'cylinder') {
+        shape = new CANNON.Cylinder(0.5, 0.5, 1, 16);
+        geometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 16);
+    }
+
+    material = new THREE.MeshStandardMaterial({ color: color });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    body = new CANNON.Body({ mass: 1 });
+    body.addShape(shape);
+    body.position.set(pos.x, pos.y, pos.z);
+    world.addBody(body);
+
+    meshes.push(mesh);
+    bodies.push(body);
+}
+
+function startGrab(pos) {
+    let closestDist = 2;
+    let target = null;
+    bodies.forEach(body => {
+        const d = body.position.distanceTo(new CANNON.Vec3(pos.x, pos.y, pos.z));
+        if (d < closestDist) { closestDist = d; target = body; }
+    });
+    if (target) {
+        grabbedBody = target;
+        meshes[bodies.indexOf(target)].material.emissive.setHex(0x333333);
+        controls.enabled = false;
+    }
+}
+
+function releaseGrab() {
+    if (grabbedBody) {
+        meshes[bodies.indexOf(grabbedBody)].material.emissive.setHex(0x000000);
+        grabbedBody = null;
+    }
+    controls.enabled = true;
+}
+
+function setShape(type) {
+    activeShape = type;
+    document.querySelectorAll('#shape-selector button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+function resetScene() {
+    meshes.forEach(m => scene.remove(m));
+    bodies.forEach(b => world.remove(b));
+    meshes = []; bodies = []; grabbedBody = null;
+}
+
+/**
+ * SETUP MEDIAPIPE
+ */
+function initHandTracking() {
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const loadingScreen = document.getElementById('loading-screen');
+
+    const hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+        maxNumHands: 2, // DETEKSI 2 TANGAN
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6
+    });
+
+    hands.onResults((results) => {
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        if (results.multiHandLandmarks) {
+            for (const landmarks of results.multiHandLandmarks) {
+                drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00d2ff', lineWidth: 1});
+                drawLandmarks(canvasCtx, landmarks, {color: '#ffffff', lineWidth: 0.5, radius: 1});
+            }
+            handleMultiHandGestures(results.multiHandLandmarks);
+        }
+        
+        canvasCtx.restore();
+        if (loadingScreen.style.opacity !== '0') {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => loadingScreen.style.display = 'none', 500);
+        }
+    });
+
+    const cameraUtils = new Camera(videoElement, {
+        onFrame: async () => { await hands.send({ image: videoElement }); },
+        width: 640, height: 480
+    });
+    cameraUtils.start();
+}
+
+/**
+ * RENDER LOOP
+ */
+let lastTime = performance.now();
+function animate() {
+    requestAnimationFrame(animate);
+    const time = performance.now();
+    const dt = Math.min((time - lastTime) / 1000, 0.1);
+    world.step(1 / 60, dt, 3);
+    lastTime = time;
+
+    controls.update();
+
+    for (let i = 0; i < meshes.length; i++) {
+        meshes[i].position.copy(bodies[i].position);
+        meshes[i].quaternion.copy(bodies[i].quaternion);
+        if (bodies[i].position.y < -15) {
+            scene.remove(meshes[i]); world.remove(bodies[i]);
+            meshes.splice(i, 1); bodies.splice(i, 1); i--;
+        }
+    }
+    document.getElementById('fps-val').innerText = Math.round(1 / dt);
+    renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
