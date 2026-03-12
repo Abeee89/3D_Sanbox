@@ -1,0 +1,42 @@
+.control-panel h1 {
+  margin: 0 0 10px 0;
+  font-size: 1.2rem;
+  color: #00d2ff;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.control-panel button {
+  background: #333;
+  border: 1px solid #555;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.control-panel button:hover {
+  background: #444;
+  border-color: #888;
+}
+
+.control-panel button.active {
+  background: #00d2ff;
+  color: #000;
+  border-color: #00d2ff;
+}
+
+.reset-btn {
+  width: 100%;
+  background: #ff4757 !important;
+  border: none !important;
+}
+
+.reset-btn:hover {
+  background: #ff6b7a !important;
+}

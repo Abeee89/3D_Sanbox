@@ -1,0 +1,110 @@
+/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #111;
+  color: white;
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* UI Layer */
+#ui-layer {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Panel Base Style */
+.panel {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
+  margin-bottom: 10px;
+  max-width: 280px;
+}
+
+/* Canvas Container */
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+#canvas-container canvas {
+  display: block;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .panel {
+    padding: 15px;
+    max-width: 220px;
+  }
+
+  #webcam-container {
+    width: 180px !important;
+    height: 135px !important;
+    bottom: 10px !important;
+    right: 10px !important;
+  }
+
+  #ui-layer {
+    top: 10px;
+    left: 10px;
+  }
+
+  .gesture-key {
+    font-size: 0.6rem !important;
+  }
+}
+
+/* Animation for smooth transitions */
+.panel,
+button {
+  transition: all 0.2s ease;
+}
+
+/* Selection highlight */
+::selection {
+  background: #00d2ff;
+  color: #000;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
