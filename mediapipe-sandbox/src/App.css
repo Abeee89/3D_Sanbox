@@ -39,7 +39,9 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
   pointer-events: auto;
   margin-bottom: 10px;
-  max-width: 280px;
+  max-width: 320px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 
 /* Canvas Container */
@@ -59,7 +61,8 @@ body {
 @media (max-width: 768px) {
   .panel {
     padding: 15px;
-    max-width: 220px;
+    max-width: 235px;
+    max-height: calc(100vh - 20px);
   }
 
   #webcam-container {

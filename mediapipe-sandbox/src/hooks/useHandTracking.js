@@ -23,8 +23,20 @@ const HAND_CONNECTIONS = [
 export function useHandTracking(videoRef, canvasRef, onHandsDetected) {
   const handsRef = useRef(null);
   const cameraRef = useRef(null);
+  const onHandsDetectedRef = useRef(onHandsDetected);
+  const optionsRef = useRef({
+    modelComplexity: 1,
+    maxNumHands: 2,
+    drawOverlay: true,
+    resolution: { width: 640, height: 480 }
+  });
+  const hasLoadedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isTracking, setIsTracking] = useState(false);
+
+  useEffect(() => {
+    onHandsDetectedRef.current = onHandsDetected;
+  }, [onHandsDetected]);
 
   useEffect(() => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -38,45 +50,59 @@ export function useHandTracking(videoRef, canvasRef, onHandsDetected) {
     });
 
     hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 1,
+      maxNumHands: optionsRef.current.maxNumHands,
+      modelComplexity: optionsRef.current.modelComplexity,
       minDetectionConfidence: 0.6,
       minTrackingConfidence: 0.6
     });
 
     hands.onResults((results) => {
-      // Draw to canvas
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      const { drawOverlay } = optionsRef.current;
+
+      if (drawOverlay) {
+        // Drawing is optional to reduce per-frame work on low-end devices.
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      }
 
       if (results.multiHandLandmarks) {
-        for (const landmarks of results.multiHandLandmarks) {
-          drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
-            color: '#00d2ff',
-            lineWidth: 1
-          });
-          drawLandmarks(canvasCtx, landmarks, {
-            color: '#ffffff',
-            lineWidth: 0.5,
-            radius: 1
-          });
+        if (drawOverlay) {
+          for (const landmarks of results.multiHandLandmarks) {
+            drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
+              color: '#00d2ff',
+              lineWidth: 1
+            });
+            drawLandmarks(canvasCtx, landmarks, {
+              color: '#ffffff',
+              lineWidth: 0.5,
+              radius: 1
+            });
+          }
         }
+
         // Call callback with landmarks
-        if (onHandsDetected) {
-          onHandsDetected(results.multiHandLandmarks);
+        if (onHandsDetectedRef.current) {
+          onHandsDetectedRef.current(results.multiHandLandmarks);
         }
       } else {
         // No hands detected
-        if (onHandsDetected) {
-          onHandsDetected(null);
+        if (drawOverlay) {
+          canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        }
+
+        if (onHandsDetectedRef.current) {
+          onHandsDetectedRef.current(null);
         }
       }
 
-      canvasCtx.restore();
+      if (drawOverlay) {
+        canvasCtx.restore();
+      }
 
       // Mark as loaded after first result
-      if (isLoading) {
+      if (!hasLoadedRef.current) {
+        hasLoadedRef.current = true;
         setIsLoading(false);
       }
     });
@@ -84,14 +110,16 @@ export function useHandTracking(videoRef, canvasRef, onHandsDetected) {
     handsRef.current = hands;
 
     // Initialize camera
+    const { width, height } = optionsRef.current.resolution;
+
     const camera = new Camera(videoRef.current, {
       onFrame: async () => {
         if (handsRef.current) {
           await handsRef.current.send({ image: videoRef.current });
         }
       },
-      width: 640,
-      height: 480
+      width,
+      height
     });
 
     camera.start().then(() => {
@@ -109,7 +137,29 @@ export function useHandTracking(videoRef, canvasRef, onHandsDetected) {
         handsRef.current.close();
       }
     };
-  }, [videoRef, canvasRef, onHandsDetected, isLoading]);
+  }, [videoRef, canvasRef]);
+
+  const updateTrackingOptions = useCallback((nextOptions) => {
+    const merged = {
+      ...optionsRef.current,
+      ...nextOptions,
+      resolution: {
+        ...optionsRef.current.resolution,
+        ...(nextOptions?.resolution || {})
+      }
+    };
+
+    optionsRef.current = merged;
+
+    if (handsRef.current) {
+      handsRef.current.setOptions({
+        maxNumHands: merged.maxNumHands,
+        modelComplexity: merged.modelComplexity,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6
+      });
+    }
+  }, []);
 
   const stopTracking = useCallback(() => {
     if (cameraRef.current) {
@@ -129,6 +179,7 @@ export function useHandTracking(videoRef, canvasRef, onHandsDetected) {
     isLoading,
     isTracking,
     stopTracking,
-    startTracking
+    startTracking,
+    updateTrackingOptions
   };
 }

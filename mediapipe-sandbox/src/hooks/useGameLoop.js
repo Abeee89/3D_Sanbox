@@ -8,38 +8,43 @@ import { useRef, useEffect, useCallback } from 'react';
  */
 export function useGameLoop(onUpdate, isRunning = true) {
   const requestRef = useRef(null);
-  const lastTimeRef = useRef(performance.now());
+  const onUpdateRef = useRef(onUpdate);
   const fpsRef = useRef(0);
 
-  const loop = useCallback(() => {
-    const time = performance.now();
-    const deltaTime = Math.min((time - lastTimeRef.current) / 1000, 0.1); // Cap at 100ms
-    lastTimeRef.current = time;
-
-    // Calculate FPS
-    fpsRef.current = Math.round(1 / deltaTime);
-
-    // Call update callback
-    if (onUpdate) {
-      onUpdate(deltaTime, fpsRef.current);
-    }
-
-    // Continue loop
-    requestRef.current = requestAnimationFrame(loop);
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
   }, [onUpdate]);
 
   useEffect(() => {
-    if (isRunning) {
-      lastTimeRef.current = performance.now();
-      requestRef.current = requestAnimationFrame(loop);
+    if (!isRunning) {
+      return undefined;
     }
+
+    let lastTime = performance.now();
+
+    const loop = (time) => {
+      const deltaTime = Math.min((time - lastTime) / 1000, 0.1); // Cap at 100ms
+      lastTime = time;
+
+      // Calculate FPS
+      fpsRef.current = Math.round(1 / Math.max(deltaTime, 1 / 240));
+
+      // Call update callback
+      if (onUpdateRef.current) {
+        onUpdateRef.current(deltaTime, fpsRef.current);
+      }
+
+      requestRef.current = requestAnimationFrame(loop);
+    };
+
+    requestRef.current = requestAnimationFrame(loop);
 
     return () => {
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
       }
     };
-  }, [isRunning, loop]);
+  }, [isRunning]);
 
   const getFps = useCallback(() => fpsRef.current, []);
 

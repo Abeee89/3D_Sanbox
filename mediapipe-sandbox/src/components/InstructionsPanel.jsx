@@ -7,7 +7,10 @@ function InstructionsPanel() {
   const instructions = [
     { key: 'KLIK & SERET', action: 'Putar Arena' },
     { key: 'DUA TANGAN TERBUKA', action: 'Munculkan Objek' },
-    { key: 'SATU TANGAN CUBIT', action: 'Ambil Objek' }
+    { key: 'SATU TANGAN CUBIT', action: 'Ambil Objek' },
+    { key: 'DUA TANGAN CUBIT', action: 'Blast Dorong Objek' },
+    { key: 'SPACE / E', action: 'Burst / Blast via Keyboard' },
+    { key: 'F / V / R', action: 'Freeze, Toggle Webcam, Reset' }
   ];
 
   return (

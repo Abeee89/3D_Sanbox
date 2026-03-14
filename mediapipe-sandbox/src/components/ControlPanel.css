@@ -4,10 +4,22 @@
   color: #00d2ff;
 }
 
+.section-label {
+  margin: 12px 0 7px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8ea6b4;
+}
+
 .btn-group {
   display: flex;
   gap: 8px;
   margin-bottom: 15px;
+}
+
+.quality-selector {
+  margin-bottom: 10px;
 }
 
 .control-panel button {
@@ -29,6 +41,56 @@
   background: #00d2ff;
   color: #000;
   border-color: #00d2ff;
+}
+
+.slider-wrap {
+  margin-bottom: 10px;
+}
+
+.slider-wrap label {
+  display: block;
+  font-size: 0.78rem;
+  margin-bottom: 6px;
+  color: #c3d3df;
+}
+
+.slider-wrap input[type='range'] {
+  width: 100%;
+  accent-color: #00d2ff;
+}
+
+.toggle-group {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.toggle-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #d2dde6;
+}
+
+.toggle-group input[type='checkbox'] {
+  accent-color: #00d2ff;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.action-btn {
+  background: #1f4254 !important;
+  border-color: #2a607c !important;
+}
+
+.action-btn:hover {
+  background: #2c5970 !important;
 }
 
 .reset-btn {

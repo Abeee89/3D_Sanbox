@@ -5,9 +5,9 @@ import './WebcamPreview.css';
 /**
  * WebcamPreview Component - Menampilkan webcam dengan overlay hand landmarks
  */
-const WebcamPreview = forwardRef(function WebcamPreview({ videoRef, canvasRef }, ref) {
+const WebcamPreview = forwardRef(function WebcamPreview({ videoRef, canvasRef, isVisible }, ref) {
   return (
-    <div id="webcam-container" ref={ref}>
+    <div id="webcam-container" ref={ref} className={isVisible ? '' : 'hidden'}>
       <video 
         ref={videoRef} 
         id="input_video"
@@ -25,7 +25,12 @@ const WebcamPreview = forwardRef(function WebcamPreview({ videoRef, canvasRef },
 
 WebcamPreview.propTypes = {
   videoRef: PropTypes.object.isRequired,
-  canvasRef: PropTypes.object.isRequired
+  canvasRef: PropTypes.object.isRequired,
+  isVisible: PropTypes.bool
+};
+
+WebcamPreview.defaultProps = {
+  isVisible: true
 };
 
 export default WebcamPreview;
