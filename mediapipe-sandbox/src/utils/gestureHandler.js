@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 
 // Configuration
-const CONFIG = {
-  pinchThreshold: 0.05,
+export const CONFIG = {
+  pinchThreshold: 0.08, // Increased for better sensitivity (was 0.05)
   handOpenThreshold: 0.15,
   handZDepth: -5,
   lerpFactor: 0.15,
@@ -12,9 +12,10 @@ const CONFIG = {
 /**
  * Detect pinch gesture (thumb tip close to index tip)
  * @param {Array} landmarks - MediaPipe hand landmarks
+ * @param {number} threshold - Optional custom threshold
  * @returns {boolean}
  */
-export function detectPinch(landmarks) {
+export function detectPinch(landmarks, threshold = CONFIG.pinchThreshold) {
   if (!landmarks || landmarks.length === 0) return false;
   
   const thumb = landmarks[4];
@@ -24,7 +25,7 @@ export function detectPinch(landmarks) {
     Math.pow(thumb.x - index.x, 2) + Math.pow(thumb.y - index.y, 2)
   );
   
-  return distance < CONFIG.pinchThreshold;
+  return distance < threshold;
 }
 
 /**

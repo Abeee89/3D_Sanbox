@@ -24,7 +24,8 @@ import {
   landmarkToWorldPosition,
   smoothHandPosition,
   findNearestBody,
-  getSpawnCooldown
+  getSpawnCooldown,
+  CONFIG
 } from './utils/gestureHandler';
 
 // Styles
@@ -247,7 +248,12 @@ function App() {
     updateHandPosition(smoothedPos);
 
     // Check pinch gesture
-    const isCurrentlyPinching = detectPinch(hand1);
+    // Hysteresis: If currently pinching, use a larger threshold (easier to keep pinching)
+    const pinchThreshold = isPinchingRef.current 
+      ? CONFIG.pinchThreshold * 1.5 
+      : CONFIG.pinchThreshold;
+      
+    const isCurrentlyPinching = detectPinch(hand1, pinchThreshold);
 
     if (isCurrentlyPinching && !isPinchingRef.current) {
       // Start grab

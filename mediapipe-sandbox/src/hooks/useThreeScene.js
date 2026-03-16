@@ -20,7 +20,7 @@ export function useThreeScene(containerRef) {
   const controlsRef = useRef(null);
   const handMeshRef = useRef(null);
   const directionalLightRef = useRef(null);
-  const qualityRef = useRef('normal');
+  const qualityRef = useRef('low'); // Default to low for better performance
 
   // Initialize Three.js scene
   useEffect(() => {

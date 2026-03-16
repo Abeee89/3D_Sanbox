@@ -25,7 +25,7 @@ export function useHandTracking(videoRef, canvasRef, onHandsDetected) {
   const cameraRef = useRef(null);
   const onHandsDetectedRef = useRef(onHandsDetected);
   const optionsRef = useRef({
-    modelComplexity: 1,
+    modelComplexity: 0, // Changed from 1 to 0 (Lite) for better performance
     maxNumHands: 2,
     drawOverlay: true,
     resolution: { width: 640, height: 480 }
@@ -52,8 +52,8 @@ export function useHandTracking(videoRef, canvasRef, onHandsDetected) {
     hands.setOptions({
       maxNumHands: optionsRef.current.maxNumHands,
       modelComplexity: optionsRef.current.modelComplexity,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6
+      minDetectionConfidence: 0.5, // Lowered for better tracking resilience (was 0.6)
+      minTrackingConfidence: 0.5   // Lowered for better tracking resilience (was 0.6)
     });
 
     hands.onResults((results) => {
